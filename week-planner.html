@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  try{
+    var v=localStorage.getItem("fm_ises_unlocked");
+    if(v && (Date.now()-(+v) <= 14*864e5)) return;
+  }catch(e){ return; }          /* storage blocked: let them through rather than trap them */
+  location.replace("index.html");
+})();
+</script>
 <title>Iowa Select Week Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -110,6 +119,11 @@ button,input,select{font:inherit;color:inherit}
 .ctl input{width:46px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;
   padding:3px 4px 3px 7px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
 .ctl input:focus{background:var(--surface);border-color:var(--primary)}
+.ctl.chk{cursor:pointer;gap:8px;user-select:none}
+.ctl.chk:hover{border-color:var(--line);color:var(--ink)}
+.ctl.chk input{width:auto;margin:0;padding:0;accent-color:var(--primary);cursor:pointer;
+  width:14px;height:14px;flex:none}
+.ctl.chk span{color:var(--ink-2)}
 .meta{margin-left:auto;font-size:12px;color:var(--ink-3);white-space:nowrap}
 @media(max-width:900px){.meta{margin-left:0}}
 .btn{background:var(--primary);color:#fff;border:0;border-radius:7px;padding:9px 16px;font-weight:500;font-size:13px;cursor:pointer;white-space:nowrap}
@@ -293,8 +307,12 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;bac
             <button type="button" aria-pressed="false" data-v="commit">Commit</button>
           </div>
           <div class="ctl"><label for="pool">Drivers</label><input id="pool" type="number" min="1" max="99" value="42"></div>
-          <div class="ctl"><label for="daycap">Max h/day</label><input id="daycap" type="number" min="4" max="24" step="0.5" value="10"></div>
-          <div class="ctl"><label for="wkcap">Max h/week</label><input id="wkcap" type="number" min="10" max="80" step="0.5" value="45"></div>
+          <div class="ctl"><label for="daycap">Max h/day</label><input id="daycap" type="number" min="4" max="24" step="1" value="10" inputmode="numeric"></div>
+          <div class="ctl"><label for="wkcap">Max h/week</label><input id="wkcap" type="number" min="10" max="80" step="1" value="45" inputmode="numeric"></div>
+          <label class="ctl chk" for="useyard" title="Counts the empty run out from the Iowa Falls yard to the first pickup, and back from the last delivery, inside each driver's day. Turning it off measures the day from the first chute to the last unload.">
+            <input id="useyard" type="checkbox" checked>
+            <span>Include Iowa Falls yard time</span>
+          </label>
           <span class="meta" id="lastcalc"></span>
           <button class="ctl act" id="resolve" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3699FF" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 4v5h-5"/></svg>
@@ -491,7 +509,11 @@ function airMiles(a,b){
   var x=Math.sin(dp/2)*Math.sin(dp/2)+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)*Math.sin(dl/2);
   return 2*R*Math.asin(Math.sqrt(x));
 }
+/* With the yard toggle off this returns zeros, which is what makes the whole
+   yard leg vanish everywhere at once — shift length, driver count, hours, the grey
+   bars on the timeline and the tiles all read from this one place. */
 function deadhead(m,A){
+  if(!A.yard) return {outMi:0,homeMi:0,outMin:0,homeMin:0};
   var out=airMiles(YARD,SITES[m.o]), home=airMiles(SITES[m.d],YARD);
   return {outMi:out==null?0:out*ROAD_FACTOR, homeMi:home==null?0:home*ROAD_FACTOR,
           outMin:out==null?0:Math.round(out*ROAD_FACTOR/A.mph*60),
@@ -593,8 +615,9 @@ var DRIVERS=[],TRSTATE={},SOLVED=false;
 function assumptions(){
   return {load:+$("loadmin").value||45,unload:+$("unloadmin").value||45,
           mph:Math.max(5,+$("mph").value||50),pool:Math.max(1,+$("pool").value||42),
-          cap:Math.max(1,(+$("wkcap").value||45))*60,
-          day:Math.max(1,(+$("daycap").value||10))*60,
+          cap:Math.max(1,Math.round(+$("wkcap").value||45))*60,
+          day:Math.max(1,Math.round(+$("daycap").value||10))*60,
+          yard:$("useyard").checked,
           oc:Math.max(1,+$("oc").value||2),dc:Math.max(1,+$("dc").value||2)};
 }
 function solveWeek(){
@@ -661,9 +684,10 @@ function runMovement(m,A,D,drive){
   slots.forEach(function(s){
     if(!s.legs.length) return;
     var last=s.legs[s.legs.length-1];
-    /* the final leg runs to the yard, not back to the farm — there is nothing left to load */
-    last.back=last.ulEnd+DH.homeMin;
-    last.toYard=true;
+    /* The final leg runs to the yard, not back to the farm — there is nothing left to
+       load. With the yard excluded the day simply ends when the last pigs are off. */
+    if(A.yard){ last.back=last.ulEnd+DH.homeMin; last.toYard=true; }
+    else      { last.back=last.ulEnd;            last.toYard=false; }
     var leaveYard=s.legs[0].chuteIn-DH.outMin;
     var atYard=last.back;
     var shift=atYard-leaveYard;
@@ -987,9 +1011,10 @@ function ganttHTML(day,only,hi){
                "Drive · "+fmt12(g.departs)+" – "+fmt12(g.arrives));
         s+=bar("ul",[g.arrives,g.ulEnd],pct,wd,fmt12(g.arrives),
                "Unload at "+w.mv.d+" "+w.mv.dName+" · "+fmt12(g.arrives)+" – "+fmt12(g.ulEnd));
-        s+=bar(g.toYard?"dh":"dr",[g.ulEnd,g.back],pct,wd,"",
-               g.toYard?("Back to the Iowa Falls yard · "+fmt12(g.ulEnd)+" – "+fmt12(g.back))
-                       :("Return to "+w.mv.o+" · "+fmt12(g.ulEnd)+" – "+fmt12(g.back)));
+        if(g.back>g.ulEnd)                       /* nothing to draw when the day ends at the chute */
+          s+=bar(g.toYard?"dh":"dr",[g.ulEnd,g.back],pct,wd,"",
+                 g.toYard?("Back to the Iowa Falls yard · "+fmt12(g.ulEnd)+" – "+fmt12(g.back))
+                         :("Return to "+w.mv.o+" · "+fmt12(g.ulEnd)+" – "+fmt12(g.back)));
         prev=g.back;
       });
     });
@@ -1058,9 +1083,12 @@ function renderEditor(){
       (p.spare>0?'<b style="color:#0B8B85">'+p.need+" driver"+(p.need===1?"":"s")+" could run this inside the "+
         (assumptions().day/60)+"-hour day — "+p.spare+" fewer than the sheet asked.</b><br>":"")+
       (p.overDay?'<b style="color:var(--bad)">One round trip is '+dur(p.cycle)+", already past the daily cap.</b><br>":"")+
-      (p.rows.length?"<b>Leaves the yard "+hhmm(p.rows[0].start)+"</b> — "+
-        p.dh.outMi.toFixed(0)+" mi out ("+dur(p.dh.outMin)+"), back "+p.dh.homeMi.toFixed(0)+
-        " mi from the last delivery ("+dur(p.dh.homeMin)+")<br>":"")+
+      (p.rows.length?(assumptions().yard
+        ? "<b>Leaves the yard "+hhmm(p.rows[0].start)+"</b> — "+
+          p.dh.outMi.toFixed(0)+" mi out ("+dur(p.dh.outMin)+"), back "+p.dh.homeMi.toFixed(0)+
+          " mi from the last delivery ("+dur(p.dh.homeMin)+")<br>"
+        : "<b>First chute "+hhmm(p.rows[0].start)+"</b> — yard time excluded; the day is measured "+
+          "from the first pickup to the last unload<br>"):"")+
       p.rows.length+" driver"+(p.rows.length===1?"":"s")+" × "+
       (p.rows[0]?p.rows[0].turns:0)+(p.rows.length&&p.rows[0].turns!==p.rows[p.rows.length-1].turns?"/"+p.rows[p.rows.length-1].turns:"")+
       " turns · cycle "+dur(p.rows[0]?p.rows[0].cycle:0)+" · "+hrs(p.hoursTotal)+" driver-hours</div>"+
@@ -1342,7 +1370,19 @@ $("apiprose").innerHTML=[
 ].join("");
 
 /* ================= wiring ================= */
-["loadmin","unloadmin","mph","pool","wkcap","daycap","oc","dc"].forEach(function(id){
+/* Hour caps are whole hours. Snap what was typed so the box shows what the solver used
+   rather than silently rounding 10.5 behind the planner's back. */
+["daycap","wkcap"].forEach(function(id){
+  var el=$(id);
+  /* Let the decimal be typed and round it on the way out. Blocking the key looks
+     tidier but turns "10.5" into "105", which is worse than showing 11. */
+  el.addEventListener("change",function(){
+    var lo=+this.min||1, hi=+this.max||99, v=Math.round(+this.value);
+    if(!isFinite(v)||!v) v=lo;
+    this.value=String(Math.min(hi,Math.max(lo,v)));
+  });
+});
+["loadmin","unloadmin","mph","pool","wkcap","daycap","oc","dc","useyard"].forEach(function(id){
   $(id).addEventListener("change",function(){
     if(id==="oc"||id==="dc") WEEK.forEach(function(m){ m.chuteAuto=true; });
     SOLVED=false; render();
