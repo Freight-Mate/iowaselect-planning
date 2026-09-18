@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  try{
+    var v=localStorage.getItem("fm_ises_unlocked");
+    if(v && (Date.now()-(+v) <= 14*864e5)) return;
+  }catch(e){ return; }          /* storage blocked: let them through rather than trap them */
+  location.replace("index.html");
+})();
+</script>
 <title>Freight Mate Iowa Select Planning Tool</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
