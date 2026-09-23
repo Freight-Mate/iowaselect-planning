@@ -1,4 +1,19 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<script>
+(function(){
+  if(location.protocol==="file:") return;   /* opened from your own computer: no hub to unlock, so skip the gate */
+  try{
+    var v=localStorage.getItem("fm_ises_unlocked");
+    if(v && (Date.now()-(+v) <= 14*864e5)) return;
+  }catch(e){ return; }          /* storage blocked: let them through rather than trap them */
+  location.replace("index.html");
+})();
+</script>
 <title>Iowa Select Week Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -148,11 +163,13 @@ button,input,select{font:inherit;color:inherit}
    minmax(0,1fr) lets them compress instead of spilling onto a second line. */
 /* Tracks sized to what each field actually holds, not evenly: a load count needs half
    the room a date picker does, and the trailer name has to clear its own dropdown arrow.
+   Head/load holds at most four digits; Load time has a floor so "05:00 AM" and the
+   clock icon always fit.
    Order: Loads, Drivers, Head/load, Day, Miles, Drive min, Pickup, Delivery, Load time, Trailer. */
 .mvrow{display:grid;gap:9px;align-items:end;
   grid-template-columns:
-    minmax(0,.5fr) minmax(0,.5fr) minmax(0,1fr) minmax(0,1.5fr) minmax(0,.5fr)
-    minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)}
+    minmax(0,.5fr) minmax(0,.5fr) minmax(0,.65fr) minmax(0,1.5fr) minmax(0,.5fr)
+    minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(128px,1.35fr) minmax(0,2fr)}
 .mvrow .f label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mvrow .f input,.mvrow .f select{min-width:0;width:100%}
 /* The spinner arrows cost ~17px a field — more than the value needs in the half-width
@@ -313,6 +330,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;bac
 .foot{font-size:11.5px;color:var(--ink-4);max-width:78ch;margin:4px 0 0;line-height:1.6}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+</head>
+<body>
 
 <div class="app" id="app">
   <div class="scrim" id="scrim"></div>
@@ -1468,4 +1487,5 @@ render();
 
 </script>
 
-</body></html>
+</body>
+</html>
